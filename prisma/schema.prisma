@@ -1,0 +1,87 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 顧客リストモデル
+model Customer {
+  id        Int      @id @default(autoincrement()) // 主キー、自動採番
+  name      String   // 顧客名 (Stringはテキスト型に対応、NOT NULLがデフォルト)
+  address   String?  // 住所 (末尾の?はオプショナル、NULLを許可)
+  phone     String?  @unique
+  createdAt DateTime @default(now()) @map("created_at") // 作成日時
+  orders    Order[]  // この顧客が行った注文のリスト (リレーション)
+
+  @@map("customers") // データベース上のテーブル名を指定 (小保文字複数形が一般的)
+}
+
+// 切り方モデル
+model Cut {
+  id          Int      @id @default(autoincrement()) // 主キー、自動採番
+  partName    String   @map("part_name")             // 部位名
+  thicknessMm Int?     @map("thickness_mm")         // 厚さ (ミリメートル、整数、オプショナル)
+  description String?  // 説明 (オプショナル)
+  createdAt   DateTime @default(now()) @map("created_at") // 作成日時
+  orderItems   OrderItem[] // この切り方が使われた注文アイテムのリスト (リレーション)
+
+  @@map("cuts") // データベース上のテーブル名を指定
+}
+
+// 商品モデル (meatProducts をDBで管理する場合)
+model Product {
+  id           Int         @id @default(autoincrement()) // IDは String でも可
+  name         String      @unique // 商品名 (例: "スライス", "ブロック")
+  pricePerUnit Int         @map("price_per_unit") // 例: 100gあたりの価格 (円)
+  // unit      String?     // 標準単位があれば (例: "g")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  orderItems   OrderItem[] // この商品が含まれる注文アイテムのリスト (リレーション)
+
+  @@map("products")
+}
+
+// 注文ヘッダーモデル
+model Order {
+  id          Int      @id @default(autoincrement())
+  customerId  Int      @map("customer_id") // 外部キーフィールド
+  customer    Customer @relation(fields: [customerId], references: [id]) // Customerモデルへのリレーション定義
+  orderDate   DateTime @default(now()) @map("order_date") // 注文日時
+  pickupTime  String   @map("pickup_time") // 受取時間 (HH:mm 形式の文字列) ※DateTimeにするか要検討
+  totalAmount Int      @map("total_amount") // 合計金額 (円)
+  status      String   // 注文ステータス (例: "受付済み", "準備中", "完了", "キャンセル")
+  notes       String?  // 備考
+  createdAt   DateTime @default(now()) @map("created_at") // レコード作成日時
+  items       OrderItem[] // この注文に含まれるアイテムのリスト (リレーション)
+
+  @@index([customerId]) // 顧客IDでの検索を高速化するインデックス
+  @@map("orders")
+}
+
+// 注文明細モデル
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int     @map("order_id") // 外部キーフィールド
+  order     Order   @relation(fields: [orderId], references: [id]) // Orderモデルへのリレーション定義
+  productId Int     @map("product_id") // 外部キーフィールド (Product.idの型に合わせる)
+  product   Product @relation(fields: [productId], references: [id]) // Productモデルへのリレーション定義
+  cutId     Int     @map("cut_id") // 外部キーフィールド
+  cut       Cut     @relation(fields: [cutId], references: [id]) // Cutモデルへのリレーション定義
+  quantity  Int     // 数量
+  unit      String  // 単位 ("g" or "枚")
+  // priceAtOrder Int? // 注文時の単価を記録する場合 (価格変動に対応)
+
+  @@index([orderId])   // 注文IDでの検索を高速化
+  @@index([productId]) // 商品IDでの検索を高速化
+  @@index([cutId])     // 切り方IDでの検索を高速化
+  @@map("order_items")
+}
