@@ -34,6 +34,7 @@ type OrderContextType = {
   addOrder: (order: Omit<Order, "id">) => void
   updateOrderStatus: (id: string, status: string) => void
   getCompletedOrders: () => Order[] // 完了済み注文の取得メソッド
+  clearOrders: () => void
 }
 
 // コンテキスト作成
@@ -147,8 +148,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     return completedOrders;
   }
 
+  const clearOrders = () => {
+    setOrders([]);
+    localStorage.removeItem(STORAGE_KEY);
+    console.log("すべての注文がクリアされました。");
+  };
+
   return (
-    <OrderContext.Provider value={{ orders, completedOrders, addOrder, updateOrderStatus, getCompletedOrders }}>
+    <OrderContext.Provider value={{ orders, completedOrders, addOrder, updateOrderStatus, getCompletedOrders, clearOrders }}>
       {children}
     </OrderContext.Provider>
   )

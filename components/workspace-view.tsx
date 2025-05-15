@@ -11,6 +11,7 @@ import { format, differenceInMinutes, parse } from "date-fns"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { meatParts, deliveryOptions as masterDeliveryOptions } from "@/lib/masterData"
 
 const statusColors: Record<string, string> = {
   受付済み: "bg-blue-100 text-blue-800",
@@ -30,14 +31,10 @@ const categoryColors: Record<string, string> = {
 // カテゴリ判定用のキーワード (例)
 const hormoneKeywords = ["ホルモン", "レバー", "ミノ", "ハツ", "センマイ", "ギアラ", "テッチャン", "シマチョウ", "マルチョウ"];
 
-// 配達方法の表示名と値 (new-order.tsx と合わせる)
-const deliveryOptions = [
-  { value: "local", label: "地元配達" },
-  { value: "hiroshima", label: "広島配達" },
-  { value: "sagawa", label: "佐川急便" },
-  { value: "yamato", label: "ヤマト運輸" },
-  { value: "pickup", label: "店頭受取" }, // 表示名を調整
-];
+// Use the imported deliveryOptions, aliased to masterDeliveryOptions if needed
+// If you removed the local one, you can use deliveryOptions directly from import.
+// For clarity, assuming masterDeliveryOptions is the one to use:
+const currentDeliveryOptions = masterDeliveryOptions;
 
 // 配達方法タグの色定義
 const deliveryMethodColors: Record<string, string> = {
@@ -58,6 +55,30 @@ const deliveryMethodBgColors: Record<string, string> = {
   default: "bg-gray-100 hover:bg-gray-200",      // white->100, 50->200 (未設定時も少し色付け)
 };
 
+// Assuming Order and OrderItem types are defined (ideally imported from context or types file)
+interface OrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  cutType?: string;
+  part?: string;
+  actualWeight?: number; // Ensure this matches your context definition
+  // Add any other item properties
+}
+
+interface Order {
+  id: string;
+  customer: string;
+  phone: string;
+  pickupTime: string;
+  status: string;
+  items: OrderItem[];
+  deliveryMethod?: string;
+  notes?: string;
+  // Add any other order properties
+}
+
 export default function WorkspaceView() {
   const router = useRouter()
   const { orders, updateOrderStatus, updateOrderItemWeight } = useOrders()
@@ -75,7 +96,7 @@ export default function WorkspaceView() {
   }, [])
 
   // 当日の注文のみフィルタリング
-  const todayOrders = orders.filter((order) => {
+  const todayOrders = orders.filter((order: Order) => {
     try {
       return order.status !== "キャンセル" && order.status !== "完了"
     } catch (e) {
@@ -84,7 +105,7 @@ export default function WorkspaceView() {
   })
 
   // 残り時間を計算する関数
-  const calculateRemainingTime = (pickupTime) => {
+  const calculateRemainingTime = (pickupTime: string): number => {
     try {
       // 現在の日付と受け取り時間を組み合わせて日時を作成
       const today = format(currentTime, "yyyy-MM-dd")
@@ -100,14 +121,14 @@ export default function WorkspaceView() {
   }
 
   // 残り時間でソート
-  const sortOrdersByRemainingTime = (a, b) => {
+  const sortOrdersByRemainingTime = (a: Order, b: Order): number => {
     const remainingTimeA = calculateRemainingTime(a.pickupTime)
     const remainingTimeB = calculateRemainingTime(b.pickupTime)
     return remainingTimeA - remainingTimeB
   }
 
   // 残り時間を表示用にフォーマット
-  const formatRemainingTime = (minutes) => {
+  const formatRemainingTime = (minutes: number): string => {
     if (minutes < 0) {
       return `${Math.abs(minutes)}分超過`
     } else if (minutes === 0) {
@@ -131,7 +152,7 @@ export default function WorkspaceView() {
   }
 
   // ステータス変更ハンドラー
-  const handleStatusChange = (id, newStatus) => {
+  const handleStatusChange = (id: string, newStatus: string) => {
     updateOrderStatus(id, newStatus)
     setLastRefreshed(new Date())
   }
@@ -213,13 +234,13 @@ export default function WorkspaceView() {
   };
 
   // 注文カードコンポーネント
-  const OrderCard = ({ order }) => {
+  const OrderCard = ({ order }: { order: Order }) => {
     const remainingMinutes = calculateRemainingTime(order.pickupTime)
     const isUrgent = remainingMinutes <= 60 && remainingMinutes > 0
     const isOverdue = remainingMinutes < 0
 
     // --- カテゴリタグを特定するロジック ---
-    const getCategoryTags = (items) => {
+    const getCategoryTags = (items: OrderItem[]): string[] => {
       const tags = new Set<string>();
       items.forEach(item => {
         // 1. ホルモン判定
@@ -243,13 +264,13 @@ export default function WorkspaceView() {
     // --- カテゴリタグ特定ロジックここまで ---
 
     // --- 配達方法の表示名を取得 ---
-    const deliveryMethodLabel = deliveryOptions.find(opt => opt.value === order.deliveryMethod)?.label || order.deliveryMethod || "未設定";
-    const deliveryMethodTagColorClass = deliveryMethodColors[order.deliveryMethod] || deliveryMethodColors['pickup']; // タグ用
-    const deliveryMethodBgClass = deliveryMethodBgColors[order.deliveryMethod] || deliveryMethodBgColors['default']; // ★ 背景用
+    const deliveryMethodLabel = currentDeliveryOptions.find(opt => opt.value === order.deliveryMethod)?.label || order.deliveryMethod || "未設定";
+    const deliveryMethodTagColorClass = deliveryMethodColors[order.deliveryMethod || 'pickup'] || deliveryMethodColors['pickup']; // タグ用
+    const deliveryMethodBgClass = deliveryMethodBgColors[order.deliveryMethod || 'default'] || deliveryMethodBgColors['default']; // ★ 背景用
     // --- ここまで ---
 
     // 各アイテムの入力重量を管理するstate
-    const initialWeights = order.items.reduce((acc, item) => {
+    const initialWeights = order.items.reduce((acc: Record<string, number | string>, item: OrderItem) => {
       acc[item.id] = item.actualWeight ?? '';
       return acc;
     }, {});
@@ -259,7 +280,7 @@ export default function WorkspaceView() {
       setItemWeights(prev => ({ ...prev, [itemId]: value }));
     };
 
-    const nextStatus = {
+    const nextStatus: Record<string, string> = {
       受付済み: "準備中",
       準備中: "完了",
       完了: "完了",
@@ -340,10 +361,16 @@ export default function WorkspaceView() {
 
             <div className="font-medium mt-2">注文内容:</div>
             <div className="space-y-3">
-              {order.items.map((item, index) => (
+              {order.items.map((item: OrderItem, index: number) => (
                 <div key={item.id ?? index} className="flex flex-col sm:flex-row sm:items-center justify-between p-2 border rounded-md">
                   <div className="text-sm mb-2 sm:mb-0 flex-1 pr-2">
-                    {item.name} ({item.quantity}
+                    {item.name}
+                    {/* ▼ meatParts を使って部位ラベルを表示 ▼ */}
+                    {item.part && meatParts.find(p => p.value === item.part) && (
+                       <span className="text-xs text-muted-foreground"> ({meatParts.find(p => p.value === item.part)?.label})</span>
+                    )}
+                    {/* ▲ ここまで ▲ */}
+                    {' '}({item.quantity}
                     {item.unit}
                     {item.cutType ? `・${item.cutType}` : ""})
                     {item.actualWeight != null && <span className="text-xs text-muted-foreground ml-1">(実: {item.actualWeight}{item.unit})</span>}
@@ -422,7 +449,7 @@ export default function WorkspaceView() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {todayOrders.length > 0 ? (
-          [...todayOrders].sort(sortOrdersByRemainingTime).map((order) => <OrderCard key={order.id} order={order} />)
+          [...todayOrders].sort(sortOrdersByRemainingTime).map((order: Order) => <OrderCard key={order.id} order={order} />)
         ) : (
           <div className="col-span-full text-center py-10 text-muted-foreground">処理待ちの注文はありません</div>
         )}

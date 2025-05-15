@@ -21,6 +21,7 @@ import { useOrders } from "@/contexts/order-context"
 import { format, parse, differenceInMinutes } from "date-fns"
 import ExportOrders from "@/components/export-orders"
 import { useToast } from "@/hooks/use-toast"
+import { meatParts } from "@/lib/masterData"
 
 const statusColors: Record<string, string> = {
   受付済み: "bg-blue-100 text-blue-800",
@@ -157,7 +158,7 @@ export default function OrderManagement() {
     if (window.confirm("本当にすべての注文データをリセットしますか？この操作は元に戻せません。")) {
       if (typeof clearOrders === 'function') {
         try {
-          clearOrders(); // useOrders から提供されたリセット関数を実行
+          clearOrders();
           toast({
             title: "リセット完了",
             description: "すべての注文データが削除されました。",
@@ -360,7 +361,11 @@ export default function OrderManagement() {
                         <ul className="list-disc list-inside text-sm space-y-1">
                           {order.items.map((item, index) => (
                             <li key={item.id ?? index}>
-                              {item.name} ({item.quantity}
+                              {item.name}
+                              {item.part && meatParts.find(p => p.value === item.part) && (
+                                <span className="text-xs text-muted-foreground"> ({meatParts.find(p => p.value === item.part)?.label})</span>
+                              )}
+                              {' '}({item.quantity}
                               {item.unit}
                               {item.cutType ? `・${item.cutType}` : ""})
                               {typeof item.actualWeight === 'number' && item.actualWeight >= 0 && (

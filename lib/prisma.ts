@@ -1,10 +1,9 @@
-// import { PrismaClient } from '@prisma/client'; // ← これを削除またはコメントアウト
-import { PrismaClient } from './generated/prisma'; // ← 生成先のパスからインポート
+import { PrismaClient } from '@prisma/client';
 
 // グローバルスコープに宣言（ホットリロード対策）
 declare global {
   // allow global `var` declarations
-  // eslint-disable-next-line no-var
+  // eslint-disable-next-line no-unused-vars
   var prisma: PrismaClient | undefined
 }
 
@@ -12,7 +11,7 @@ declare global {
 export const prisma =
   global.prisma ||
   new PrismaClient({
-    // log: ['query'], // 開発時にクエリログを見たい場合
+    // log: ['query', 'info', 'warn', 'error'], // 必要に応じてログレベルを設定
   })
 
 if (process.env.NODE_ENV !== 'production') global.prisma = prisma
